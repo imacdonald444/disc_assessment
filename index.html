@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DISC Assessment</title>
+<!-- DISC Assessment App | Rev 1.0 | 2026-10-01 | Initial build -->
+<style>
+  :root{--bg:#f5f6f8;--card:#fff;--ink:#1f2933;--muted:#6b7785;--line:#e3e7ec;--brand:#2b3a4a;--accent:#2f6db5;
+        --D:#d64545;--I:#e0a526;--S:#3a9a5b;--C:#2f6db5;}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Segoe UI",system-ui,-apple-system,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:15px}
+  header{background:var(--brand);color:#fff;padding:14px 24px;display:flex;align-items:center;justify-content:space-between}
+  header h1{font-size:18px;margin:0;font-weight:600;letter-spacing:.3px}
+  header .who{font-size:13px;opacity:.9;display:flex;gap:12px;align-items:center}
+  header button{background:transparent;border:1px solid rgba(255,255,255,.5);color:#fff}
+  main{max-width:1120px;margin:28px auto;padding:0 16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:24px;margin-bottom:20px}
+  .narrow{max-width:420px;margin:40px auto}
+  h2{margin:0 0 6px;font-size:20px} h3{margin:18px 0 8px;font-size:16px}
+  .muted{color:var(--muted);font-size:13px}
+  label{display:block;font-size:13px;font-weight:600;margin:14px 0 4px}
+  input,select{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:6px;font-size:14px;font-family:inherit}
+  input:focus,select:focus{outline:2px solid #bcd3f0;border-color:var(--accent)}
+  button{font-family:inherit;font-size:14px;padding:9px 16px;border-radius:6px;border:1px solid var(--line);background:#fff;cursor:pointer}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  button.danger{color:#b42318;border-color:#f3c3be}
+  button.sm{padding:5px 10px;font-size:12px}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .spacer{flex:1}
+  .tabs{display:flex;border-bottom:1px solid var(--line);margin-bottom:8px}
+  .tabs button{border:none;border-bottom:2px solid transparent;border-radius:0;background:none;padding:10px 14px;color:var(--muted)}
+  .tabs button.on{border-bottom-color:var(--accent);color:var(--ink);font-weight:600}
+  .msg{padding:10px 12px;border-radius:6px;font-size:13px;margin-top:14px}
+  .msg.err{background:#fdecea;color:#8a1c12}.msg.ok{background:#e8f5ec;color:#1d5e33}.msg.info{background:#eef4fb;color:#1f4a7a}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:9px 7px;border-bottom:1px solid var(--line);vertical-align:middle}
+  th{font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);font-weight:600}
+  .pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;background:#eef1f4}
+  .pill.admin{background:#e4ecf8;color:#1f4a7a}.pill.off{background:#fdecea;color:#8a1c12}
+  .style{display:inline-flex;align-items:center;justify-content:center;min-width:44px;height:44px;padding:0 10px;border-radius:8px;color:#fff;font-weight:700;font-size:18px}
+  .progress{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin:10px 0 20px}
+  .progress div{height:100%;background:var(--accent);transition:width .2s}
+  .q th:nth-child(n+2),.q td:nth-child(n+2){text-align:center;width:90px}
+  .q td:first-child{font-size:15px;padding:13px 8px}
+  .q input{width:18px;height:18px;cursor:pointer}
+  .bars .b{display:flex;align-items:center;gap:10px;margin:8px 0}
+  .bars .l{width:150px;font-weight:600;font-size:14px}
+  .bars .t{flex:1;height:22px;background:#eef1f4;border-radius:4px;overflow:hidden}
+  .bars .f{height:100%}
+  .bars .v{width:44px;text-align:right;font-weight:600}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:700px){.grid2{grid-template-columns:1fr}}
+  ul{margin:6px 0;padding-left:20px} li{margin:3px 0}
+  .stat{flex:1;min-width:110px;border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+  .stat b{display:block;font-size:22px}
+  .modal{position:fixed;inset:0;background:rgba(20,30,40,.45);display:flex;align-items:center;justify-content:center;z-index:9}
+  .modal .card{width:400px;max-width:92vw;margin:0}
+</style>
+</head>
+<body>
+<header>
+  <h1>DISC Assessment</h1>
+  <div class="who" id="who"></div>
+</header>
+<main id="app"></main>
+<div id="modal"></div>
+
+<script>
+/* =====================================================================
+   DISC Assessment App  –  Rev 1.0 (2026-10-01)
+   Storage: browser localStorage (key below). Admin can export/import a
+   JSON backup. Client-side auth only – see notes in README section.
+   ===================================================================== */
+const STORE_KEY = 'disc_app_v1';
+const SESSION_KEY = 'disc_app_session';
+const APP_REV = '1.0';
+
+/* ---------- Original forced-choice item bank (24 groups x 4) ----------
+   Each group has one descriptor per dimension. User picks MOST like me
+   and LEAST like me. Written for this app – not from any commercial
+   instrument. */
+const GROUPS = [
+  {D:'Decisive',I:'Sociable',S:'Patient',C:'Precise'},
+  {D:'Competitive',I:'Enthusiastic',S:'Loyal',C:'Analytical'},
+  {D:'Direct',I:'Persuasive',S:'Calm',C:'Careful'},
+  {D:'Bold',I:'Optimistic',S:'Supportive',C:'Systematic'},
+  {D:'Results-driven',I:'Expressive',S:'Dependable',C:'Accurate'},
+  {D:'Assertive',I:'Talkative',S:'Even-tempered',C:'Detail-oriented'},
+  {D:'Determined',I:'Inspiring',S:'Cooperative',C:'Logical'},
+  {D:'Forceful',I:'Playful',S:'Gentle',C:'Reserved'},
+  {D:'Daring',I:'Charming',S:'Steady',C:'Orderly'},
+  {D:'Independent',I:'Outgoing',S:'Agreeable',C:'Cautious'},
+  {D:'Driven',I:'Spontaneous',S:'Consistent',C:'Thorough'},
+  {D:'Confident',I:'Lively',S:'Accommodating',C:'Disciplined'},
+  {D:'Strong-willed',I:'Friendly',S:'A good listener',C:'Methodical'},
+  {D:'Take-charge',I:'Popular',S:'Considerate',C:'Questioning'},
+  {D:'Adventurous',I:'Animated',S:'Relaxed',C:'A perfectionist'},
+  {D:'Challenging',I:'Encouraging',S:'Tolerant',C:'Objective'},
+  {D:'Fast-paced',I:'Fun-loving',S:'Predictable',C:'Factual'},
+  {D:'Ambitious',I:'Trusting',S:'Humble',C:'Diplomatic'},
+  {D:'Outspoken',I:'Convincing',S:'Willing to help',C:'Conscientious'},
+  {D:'Pioneering',I:'Magnetic',S:'Content',C:'Restrained'},
+  {D:'Firm',I:'Warm',S:'Modest',C:'Exacting'},
+  {D:'Tough-minded',I:'Energetic',S:'Peaceful',C:'Well-prepared'},
+  {D:'A risk-taker',I:'Cheerful',S:'Sincere',C:'Structured'},
+  {D:'Commanding',I:'Upbeat',S:'Team-oriented',C:'A rule-follower'}
+];
+const DIMS = ['D','I','S','C'];
+const DIM_NAME = {D:'Dominance',I:'Influence',S:'Steadiness',C:'Conscientiousness'};
+const DIM_COLOR = {D:'#d64545',I:'#e0a526',S:'#3a9a5b',C:'#2f6db5'};
+
+/* ---------- Style interpretation text (original) ---------- */
+const PROFILE = {
+  D:{summary:'You tend to focus on results, move quickly, and take charge when a situation needs direction. You are comfortable with challenge and making decisions with incomplete information.',
+     strengths:['Drives toward goals and outcomes','Makes decisions quickly','Comfortable taking risks and responsibility','Direct, candid communication'],
+     watch:['May come across as impatient or blunt','Can overlook input or feelings of others','May push pace faster than the team can follow'],
+     works:['Clear goals with authority to act','Challenging assignments and variety','Minimal red tape'],
+     comm:['Be brief and get to the point','Focus on outcomes and options','Avoid excessive detail unless asked']},
+  I:{summary:'You tend to be energetic, people-oriented, and persuasive. You build relationships easily, bring enthusiasm to a group, and like to generate ideas and momentum.',
+     strengths:['Builds rapport and networks quickly','Motivates and encourages others','Creative and optimistic','Comfortable presenting and persuading'],
+     watch:['May overcommit or lose track of follow-through','Can underweight details and data','May avoid delivering difficult messages'],
+     works:['Collaborative, social settings','Recognition for contributions','Freedom to share ideas'],
+     comm:['Be friendly and allow time to talk','Share the big picture and vision','Confirm details and next steps in writing']},
+  S:{summary:'You tend to be steady, patient, and supportive. You value cooperation and stability, listen well, and are someone others rely on to follow through consistently.',
+     strengths:['Dependable and consistent','Strong listener and team player','Calm under pressure','Builds trust over time'],
+     watch:['May resist sudden change','Can avoid conflict or hold back concerns','May take on too much to help others'],
+     works:['Stable, predictable environment','Clear expectations and sincere appreciation','Time to adjust to change'],
+     comm:['Be warm and sincere','Explain the reasons behind changes','Ask directly for their opinion']},
+  C:{summary:'You tend to be analytical, precise, and quality-focused. You value accuracy, logic, and doing things the right way, and you like to understand the facts before acting.',
+     strengths:['High standards for quality and accuracy','Thorough analysis and planning','Objective, fact-based decisions','Organized and systematic'],
+     watch:['May over-analyze or delay decisions','Can appear critical or reserved','May be uncomfortable with ambiguity'],
+     works:['Clear standards and procedures','Time to do work correctly','Access to data and expertise'],
+     comm:['Come prepared with facts and data','Be specific and logical','Give time to review before deciding']}
+};
+
+/* ---------- Storage ---------- */
+function load(){ try{ return JSON.parse(localStorage.getItem(STORE_KEY)) || {users:[],results:[],audit:[]}; }catch(e){ return {users:[],results:[],audit:[]}; } }
+function save(){ localStorage.setItem(STORE_KEY, JSON.stringify(DB)); }
+let DB = load(); DB.users=DB.users||[]; DB.results=DB.results||[]; DB.audit=DB.audit||[];
+function audit(action, detail){ DB.audit.push({at:new Date().toISOString(), by:(me()||{}).email||'system', action, detail}); if(DB.audit.length>2000) DB.audit.shift(); }
+const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+
+/* ---------- Auth ---------- */
+function randSalt(){ const a=new Uint8Array(16); (crypto.getRandomValues?crypto.getRandomValues(a):a.forEach((_,i)=>a[i]=Math.random()*256|0)); return [...a].map(b=>b.toString(16).padStart(2,'0')).join(''); }
+async function hashPw(pw, salt){
+  const data = salt + ':' + pw;
+  if (window.crypto && crypto.subtle){
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(data));
+    return 'sha256:' + [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+  }
+  let h1=0x811c9dc5, h2=0x01000193; // fallback (non-secure contexts)
+  for (let i=0;i<data.length;i++){ h1=Math.imul(h1^data.charCodeAt(i),16777619); h2=Math.imul(h2+data.charCodeAt(i),2654435761); }
+  return 'fnv:' + (h1>>>0).toString(16) + (h2>>>0).toString(16);
+}
+function me(){ const id=sessionStorage.getItem(SESSION_KEY); return DB.users.find(u=>u.id===id && u.active); }
+function isAdmin(){ const u=me(); return u && u.role==='admin'; }
+const norm = e => (e||'').trim().toLowerCase();
+
+async function register(name,email,pw){
+  email=norm(email); name=(name||'').trim();
+  if(!name||!email||!pw) throw 'All fields are required.';
+  if(!/^\S+@\S+\.\S+$/.test(email)) throw 'Enter a valid email address.';
+  if(pw.length<8) throw 'Password must be at least 8 characters.';
+  if(DB.users.some(u=>u.email===email)) throw 'An account with that email already exists.';
+  const salt=randSalt();
+  const first = DB.users.length===0;
+  const u={id:uid('u_'),name,email,salt,hash:await hashPw(pw,salt),role:first?'admin':'user',active:true,created:new Date().toISOString()};
+  DB.users.push(u); audit('register', email + (first?' (first user → admin)':'')); save();
+  return u;
+}
+async function login(email,pw){
+  email=norm(email);
+  const u=DB.users.find(x=>x.email===email);
+  if(!u || u.hash!==await hashPw(pw,u.salt)) throw 'Invalid email or password.';
+  if(!u.active) throw 'This account has been disabled. Contact an administrator.';
+  sessionStorage.setItem(SESSION_KEY,u.id); u.lastLogin=new Date().toISOString(); audit('login',email); save();
+  return u;
+}
+function logout(){ sessionStorage.removeItem(SESSION_KEY); route('auth'); }
+
+/* ---------- Scoring ---------- */
+function score(answers){ // answers: [{most:'D',least:'S'}...]
+  const most={D:0,I:0,S:0,C:0}, least={D:0,I:0,S:0,C:0};
+  answers.forEach(a=>{ most[a.most]++; least[a.least]++; });
+  const n=answers.length, pct={};
+  DIMS.forEach(d=>{ pct[d]=Math.round(((most[d]-least[d])+n)/(2*n)*100); });
+  const ranked=[...DIMS].sort((a,b)=>pct[b]-pct[a]);
+  const primary=ranked[0];
+  const secondary = (pct[primary]-pct[ranked[1]]<=15 && pct[ranked[1]]>=50) ? ranked[1] : null;
+  const label = primary + (secondary ? secondary.toLowerCase() : '');
+  return {most,least,pct,primary,secondary,label};
+}
+
+/* ---------- Helpers ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = iso => iso ? new Date(iso).toLocaleString([], {year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+const fmtD = iso => iso ? new Date(iso).toLocaleDateString([], {year:'numeric',month:'long',day:'numeric'}) : '—';
+function styleBadge(r){ return `<span class="style" style="background:${DIM_COLOR[r.primary]}">${esc(r.label)}</span>`; }
+function userName(id){ const u=DB.users.find(x=>x.id===id); return u?u.name:'(deleted user)'; }
+function shuffled(i){ // deterministic order per group so it varies across groups but is stable
+  const arr=[...DIMS]; let s=(i+1)*9301+49297;
+  for(let k=arr.length-1;k>0;k--){ s=(s*9301+49297)%233280; const j=Math.floor(s/233280*(k+1)); [arr[k],arr[j]]=[arr[j],arr[k]]; }
+  return arr;
+}
+
+/* ---------- Router ---------- */
+let VIEW='auth', STATE={};
+function route(v,st={}){ VIEW=v; STATE=st; render(); window.scrollTo(0,0); }
+function render(){
+  const u=me();
+  if(!u && VIEW!=='auth') VIEW='auth';
+  if(VIEW==='admin' && !isAdmin()) VIEW='home';
+  $('#who').innerHTML = u ? `<span>${esc(u.name)} ${u.role==='admin'?'<span class="pill admin">Admin</span>':''}</span>
+      <button class="sm" onclick="route('home')">Home</button>
+      ${u.role==='admin'?`<button class="sm" onclick="route('admin')">Admin</button>`:''}
+      <button class="sm" onclick="logout()">Sign out</button>` : '';
+  ({auth:vAuth,home:vHome,quiz:vQuiz,result:vResult,admin:vAdmin}[VIEW]||vHome)();
+}
+
+/* ---------- Views: Auth ---------- */
+function vAuth(){
+  const first = DB.users.length===0;
+  const tab = STATE.tab || (first?'register':'login');
+  $('#app').innerHTML = `<div class="card narrow">
+    <h2>${first?'Set up administrator account':'Welcome'}</h2>
+    <div class="muted">${first?'No accounts exist yet. The first account created becomes the administrator.':'Sign in or create an account to complete your DISC assessment.'}</div>
+    ${first?'':`<div class="tabs" style="margin-top:16px"><button class="${tab==='login'?'on':''}" onclick="route('auth',{tab:'login'})">Sign in</button><button class="${tab==='register'?'on':''}" onclick="route('auth',{tab:'register'})">Create account</button></div>`}
+    <form id="af">
+      ${tab==='register'?`<label>Full name</label><input id="an" autocomplete="name">`:''}
+      <label>Email</label><input id="ae" type="email" autocomplete="username">
+      <label>Password</label><input id="ap" type="password" autocomplete="${tab==='register'?'new-password':'current-password'}">
+      ${tab==='register'?`<label>Confirm password</label><input id="ap2" type="password" autocomplete="new-password">
+        <div class="muted" style="margin-top:10px">Your results are visible to you and to app administrators.</div>`:''}
+      <div style="margin-top:18px"><button class="primary" style="width:100%">${tab==='register'?'Create account':'Sign in'}</button></div>
+      <div id="am"></div>
+    </form></div>`;
+  $('#af').onsubmit = async e=>{
+    e.preventDefault();
+    try{
+      if(tab==='register'){
+        if($('#ap').value!==$('#ap2').value) throw 'Passwords do not match.';
+        await register($('#an').value,$('#ae').value,$('#ap').value);
+        await login($('#ae').value,$('#ap').value);
+      } else await login($('#ae').value,$('#ap').value);
+      route('home');
+    }catch(err){ $('#am').innerHTML=`<div class="msg err">${esc(err)}</div>`; }
+  };
+}
+
+/* ---------- Views: Home ---------- */
+function vHome(){
+  const u=me();
+  const mine=DB.results.filter(r=>r.userId===u.id).sort((a,b)=>b.date.localeCompare(a.date));
+  const draft=JSON.parse(localStorage.getItem('disc_draft_'+u.id)||'null');
+  $('#app').innerHTML = `
+  <div class="card">
+    <h2>Hello, ${esc(u.name.split(' ')[0])}</h2>
+    <p class="muted" style="margin:6px 0 16px">The DISC assessment takes about 8–10 minutes. You'll see 24 sets of four words. For each set, choose the one that is <b>most</b> like you and the one that is <b>least</b> like you at work. There are no right or wrong answers.</p>
+    <div class="row">
+      <button class="primary" onclick="startQuiz(false)">${mine.length?'Retake assessment':'Start assessment'}</button>
+      ${draft?`<button onclick="startQuiz(true)">Resume in-progress (${draft.answers.filter(a=>a&&a.most&&a.least).length}/24)</button>`:''}
+    </div>
+  </div>
+  <div class="card">
+    <h3 style="margin-top:0">My results</h3>
+    ${mine.length?`<table><tr><th>Date</th><th>Style</th><th>D</th><th>I</th><th>S</th><th>C</th><th></th></tr>
+      ${mine.map(r=>`<tr><td>${fmt(r.date)}</td><td><b>${esc(r.label)}</b></td>${DIMS.map(d=>`<td>${r.pct[d]}</td>`).join('')}
+      <td style="text-align:right"><button class="sm" onclick="route('result',{id:'${r.id}'})">View</button> <button class="sm" onclick="downloadPdf('${r.id}')">PDF</button></td></tr>`).join('')}</table>`
+      :`<div class="muted">No completed assessments yet.</div>`}
+  </div>`;
+}
+
+/* ---------- Views: Quiz ---------- */
+function startQuiz(resume){
+  const u=me(); let d=resume?JSON.parse(localStorage.getItem('disc_draft_'+u.id)||'null'):null;
+  if(!d) d={answers:new Array(GROUPS.length).fill(null),i:0};
+  route('quiz',d);
+}
+function vQuiz(){
+  const st=STATE, i=st.i, g=GROUPS[i], order=shuffled(i), a=st.answers[i]||{};
+  const done=st.answers.filter(x=>x&&x.most&&x.least).length;
+  $('#app').innerHTML = `<div class="card">
+    <div class="row"><h2>Set ${i+1} of ${GROUPS.length}</h2><span class="spacer"></span><span class="muted">${done} completed</span></div>
+    <div class="progress"><div style="width:${done/GROUPS.length*100}%"></div></div>
+    <p class="muted" style="margin-top:0">At work, which word is <b>most</b> like you, and which is <b>least</b> like you?</p>
+    <table class="q"><tr><th>Descriptor</th><th>Most</th><th>Least</th></tr>
+    ${order.map(d=>`<tr><td>${esc(g[d])}</td>
+      <td><input type="radio" name="most" value="${d}" ${a.most===d?'checked':''}></td>
+      <td><input type="radio" name="least" value="${d}" ${a.least===d?'checked':''}></td></tr>`).join('')}
+    </table>
+    <div id="qm"></div>
+    <div class="row" style="margin-top:20px">
+      <button onclick="qNav(-1)" ${i===0?'disabled':''}>Back</button>
+      <button onclick="saveDraft();route('home')">Save &amp; exit</button>
+      <span class="spacer"></span>
+      ${i<GROUPS.length-1?`<button class="primary" onclick="qNav(1)">Next</button>`:`<button class="primary" onclick="qFinish()">Finish &amp; see results</button>`}
+    </div></div>`;
+  document.querySelectorAll('.q input').forEach(el=>el.onchange=()=>{
+    const m=document.querySelector('input[name=most]:checked'), l=document.querySelector('input[name=least]:checked');
+    if(m&&l&&m.value===l.value){ // same word can't be both – clear the other column
+      (el.name==='most'?l:m).checked=false;
+    }
+    captureAnswer(); saveDraft();
+  });
+}
+function captureAnswer(){
+  const m=document.querySelector('input[name=most]:checked'), l=document.querySelector('input[name=least]:checked');
+  STATE.answers[STATE.i]={most:m?m.value:null,least:l?l.value:null};
+}
+function saveDraft(){ localStorage.setItem('disc_draft_'+me().id, JSON.stringify(STATE)); }
+function qValid(){ const a=STATE.answers[STATE.i]; if(!a||!a.most||!a.least){ $('#qm').innerHTML='<div class="msg err">Select one word for Most and a different word for Least.</div>'; return false;} return true; }
+function qNav(dir){ captureAnswer(); if(dir>0&&!qValid()) return; STATE.i+=dir; saveDraft(); render(); }
+function qFinish(){
+  captureAnswer(); if(!qValid()) return;
+  const miss=STATE.answers.findIndex(a=>!a||!a.most||!a.least);
+  if(miss>=0){ STATE.i=miss; render(); $('#qm').innerHTML='<div class="msg err">This set still needs an answer.</div>'; return; }
+  const u=me(), s=score(STATE.answers);
+  const r={id:uid('r_'),userId:u.id,date:new Date().toISOString(),answers:STATE.answers,...s,rev:APP_REV};
+  DB.results.push(r); audit('complete assessment', u.email+' → '+s.label); save();
+  localStorage.removeItem('disc_draft_'+u.id);
+  route('result',{id:r.id});
+}
+
+/* ---------- Views: Result ---------- */
+function vResult(){
+  const r=DB.results.find(x=>x.id===STATE.id); const u=me();
+  if(!r || (r.userId!==u.id && !isAdmin())){ route('home'); return; }
+  const p=PROFILE[r.primary], s=r.secondary?PROFILE[r.secondary]:null;
+  $('#app').innerHTML = `<div class="card">
+    <div class="row">${styleBadge(r)}<div><h2 style="margin:0">${esc(userName(r.userId))} — ${DIM_NAME[r.primary]}${r.secondary?' / '+DIM_NAME[r.secondary]:''}</h2>
+      <div class="muted">Completed ${fmt(r.date)}</div></div><span class="spacer"></span>
+      <button class="primary" onclick="downloadPdf('${r.id}')">Download PDF</button>
+      <button onclick="route('${r.userId===u.id?'home':'admin'}')">Back</button></div>
+    <h3>Your DISC profile</h3>
+    <div class="bars">${DIMS.map(d=>`<div class="b"><div class="l">${DIM_NAME[d]}</div><div class="t"><div class="f" style="width:${r.pct[d]}%;background:${DIM_COLOR[d]}"></div></div><div class="v">${r.pct[d]}</div></div>`).join('')}</div>
+    <p class="muted">Scores are 0–100 relative intensity based on your Most/Least choices. Everyone is a blend of all four styles.</p>
+  </div>
+  <div class="card">
+    <h3 style="margin-top:0">Primary style: ${DIM_NAME[r.primary]}</h3>
+    <p>${p.summary}</p>
+    ${s?`<p><b>Secondary influence – ${DIM_NAME[r.secondary]}:</b> ${s.summary}</p>`:''}
+    <div class="grid2">
+      <div><h3>Strengths</h3><ul>${p.strengths.map(x=>`<li>${x}</li>`).join('')}</ul></div>
+      <div><h3>Watch-outs</h3><ul>${p.watch.map(x=>`<li>${x}</li>`).join('')}</ul></div>
+      <div><h3>Works best with</h3><ul>${p.works.map(x=>`<li>${x}</li>`).join('')}</ul></div>
+      <div><h3>Communicating with you</h3><ul>${p.comm.map(x=>`<li>${x}</li>`).join('')}</ul></div>
+    </div>
+    <p class="muted" style="margin-top:16px">DISC describes behavioral preferences. It is intended for self-awareness and team communication, not for hiring, promotion, or performance decisions.</p>
+  </div>`;
+}
+
+/* ---------- Views: Admin ---------- */
+function vAdmin(){
+  const tab=STATE.tab||'users', u=me();
+  const admins=DB.users.filter(x=>x.role==='admin'&&x.active).length;
+  const counts={D:0,I:0,S:0,C:0}; latestPerUser().forEach(r=>counts[r.primary]++);
+  let body='';
+  if(tab==='users'){
+    body=`<div class="row" style="margin-bottom:12px"><input id="uf" placeholder="Search name or email" style="max-width:280px" value="${esc(STATE.q||'')}"><span class="spacer"></span><button class="primary" onclick="addUserModal()">Add user</button></div>
+    <table><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Results</th><th>Last sign-in</th><th></th></tr>
+    ${DB.users.filter(x=>!STATE.q||(x.name+x.email).toLowerCase().includes(STATE.q.toLowerCase())).map(x=>{
+      const self=x.id===u.id, lastAdmin=x.role==='admin'&&admins<=1;
+      return `<tr><td>${esc(x.name)}${self?' <span class="muted">(you)</span>':''}</td><td>${esc(x.email)}</td>
+      <td><span class="pill ${x.role==='admin'?'admin':''}">${x.role}</span></td>
+      <td>${x.active?'Active':'<span class="pill off">Disabled</span>'}</td>
+      <td>${DB.results.filter(r=>r.userId===x.id).length}</td><td style="white-space:nowrap">${x.lastLogin?new Date(x.lastLogin).toLocaleDateString():"—"}</td>
+      <td style="text-align:right;white-space:nowrap">
+        <button class="sm" ${self||lastAdmin?'disabled':''} onclick="toggleRole('${x.id}')">${x.role==='admin'?'Make user':'Make admin'}</button>
+        <button class="sm" ${self?'disabled':''} onclick="toggleActive('${x.id}')">${x.active?'Disable':'Enable'}</button>
+        <button class="sm" onclick="resetPwModal('${x.id}')">Reset password</button>
+        <button class="sm danger" ${self||lastAdmin?'disabled':''} onclick="delUser('${x.id}')">Delete</button></td></tr>`;}).join('')}</table>`;
+  } else if(tab==='results'){
+    const rs=[...DB.results].sort((a,b)=>b.date.localeCompare(a.date)).filter(r=>!STATE.q||userName(r.userId).toLowerCase().includes(STATE.q.toLowerCase()));
+    body=`<div class="row" style="margin-bottom:12px"><input id="uf" placeholder="Search by name" style="max-width:280px" value="${esc(STATE.q||'')}"><span class="spacer"></span><button onclick="exportCsv()">Export CSV</button></div>
+    <table><tr><th>Name</th><th>Date</th><th>Style</th><th>D</th><th>I</th><th>S</th><th>C</th><th></th></tr>
+    ${rs.map(r=>`<tr><td>${esc(userName(r.userId))}</td><td>${fmt(r.date)}</td><td><b>${esc(r.label)}</b></td>${DIMS.map(d=>`<td>${r.pct[d]}</td>`).join('')}
+      <td style="text-align:right;white-space:nowrap"><button class="sm" onclick="route('result',{id:'${r.id}'})">View</button> <button class="sm" onclick="downloadPdf('${r.id}')">PDF</button> <button class="sm danger" onclick="delResult('${r.id}')">Delete</button></td></tr>`).join('')||'<tr><td colspan="8" class="muted">No results yet.</td></tr>'}</table>`;
+  } else if(tab==='data'){
+    body=`<p class="muted">All data is stored in this browser. Export a backup regularly, and use Import to move data to another browser or machine.</p>
+    <div class="row"><button class="primary" onclick="exportJson()">Export backup (.json)</button>
+    <label style="margin:0"><input type="file" id="imp" accept=".json" style="display:none"><span class="btn" style="display:inline-block;padding:9px 16px;border:1px solid var(--line);border-radius:6px;cursor:pointer;font-weight:400">Import backup…</span></label></div>
+    <h3>Activity log (latest 50)</h3>
+    <table><tr><th>When</th><th>By</th><th>Action</th><th>Detail</th></tr>
+    ${DB.audit.slice(-50).reverse().map(a=>`<tr><td>${fmt(a.at)}</td><td>${esc(a.by)}</td><td>${esc(a.action)}</td><td>${esc(a.detail)}</td></tr>`).join('')}</table>`;
+  }
+  $('#app').innerHTML = `<div class="card">
+    <h2>Administration</h2>
+    <div class="row" style="margin:14px 0 6px">
+      <div class="stat"><span class="muted">Users</span><b>${DB.users.length}</b></div>
+      <div class="stat"><span class="muted">Assessments</span><b>${DB.results.length}</b></div>
+      ${DIMS.map(d=>`<div class="stat"><span class="muted">Primary ${d}</span><b style="color:${DIM_COLOR[d]}">${counts[d]}</b></div>`).join('')}
+    </div>
+    <div class="tabs">${[['users','Users'],['results','Results'],['data','Data & log']].map(([k,l])=>`<button class="${tab===k?'on':''}" onclick="route('admin',{tab:'${k}'})">${l}</button>`).join('')}</div>
+    ${body}</div>`;
+  const f=$('#uf'); if(f){ f.oninput=()=>{ const pos=f.selectionStart; STATE.q=f.value; render(); const n=$('#uf'); n.focus(); n.setSelectionRange(pos,pos); }; }
+  const imp=$('#imp'); if(imp) imp.onchange=importJson;
+}
+function latestPerUser(){ const m={}; DB.results.forEach(r=>{ if(!m[r.userId]||m[r.userId].date<r.date) m[r.userId]=r; }); return Object.values(m); }
+function toggleRole(id){ const x=DB.users.find(u=>u.id===id); x.role=x.role==='admin'?'user':'admin'; audit('role change',x.email+' → '+x.role); save(); render(); }
+function toggleActive(id){ const x=DB.users.find(u=>u.id===id); x.active=!x.active; audit(x.active?'enable user':'disable user',x.email); save(); render(); }
+function delUser(id){
+  const x=DB.users.find(u=>u.id===id); const n=DB.results.filter(r=>r.userId===id).length;
+  if(!confirm(`Delete ${x.name} and their ${n} result(s)? This cannot be undone.`)) return;
+  DB.users=DB.users.filter(u=>u.id!==id); DB.results=DB.results.filter(r=>r.userId!==id);
+  localStorage.removeItem('disc_draft_'+id); audit('delete user',x.email+` (${n} results)`); save(); render();
+}
+function delResult(id){ const r=DB.results.find(x=>x.id===id); if(!confirm('Delete this result?')) return; DB.results=DB.results.filter(x=>x.id!==id); audit('delete result',userName(r.userId)+' '+r.date); save(); render(); }
+function modal(html,onSubmit){
+  $('#modal').innerHTML=`<div class="modal"><div class="card"><form id="mf">${html}<div id="mm"></div><div class="row" style="margin-top:18px"><span class="spacer"></span><button type="button" onclick="$('#modal').innerHTML=''">Cancel</button><button class="primary">Save</button></div></form></div></div>`;
+  $('#mf').onsubmit=async e=>{ e.preventDefault(); try{ await onSubmit(); $('#modal').innerHTML=''; render(); }catch(err){ $('#mm').innerHTML=`<div class="msg err">${esc(err)}</div>`; } };
+}
+function addUserModal(){
+  modal(`<h2>Add user</h2><label>Full name</label><input id="nn"><label>Email</label><input id="ne" type="email"><label>Temporary password</label><input id="np" type="text"><label>Role</label><select id="nr"><option value="user">User</option><option value="admin">Admin</option></select>`,
+  async()=>{ const u=await register($('#nn').value,$('#ne').value,$('#np').value); u.role=$('#nr').value; audit('admin added user',u.email+' as '+u.role); save(); });
+}
+function resetPwModal(id){
+  const x=DB.users.find(u=>u.id===id);
+  modal(`<h2>Reset password</h2><div class="muted">${esc(x.name)} (${esc(x.email)})</div><label>New password</label><input id="rp" type="text">`,
+  async()=>{ const p=$('#rp').value; if(p.length<8) throw 'Password must be at least 8 characters.'; x.salt=randSalt(); x.hash=await hashPw(p,x.salt); audit('reset password',x.email); save(); });
+}
+function dl(name,content,type){ const b=new Blob([content],{type}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500); }
+function exportJson(){ audit('export backup',''); save(); dl(`disc_backup_${new Date().toISOString().slice(0,10)}.json`,JSON.stringify(DB,null,2),'application/json'); }
+function importJson(e){
+  const f=e.target.files[0]; if(!f) return; const rd=new FileReader();
+  rd.onload=()=>{ try{ const d=JSON.parse(rd.result); if(!Array.isArray(d.users)||!Array.isArray(d.results)) throw 0;
+      if(!d.users.some(u=>u.role==='admin'&&u.active)) { alert('Import rejected: backup has no active admin.'); return; }
+      if(!confirm(`Replace current data with backup (${d.users.length} users, ${d.results.length} results)?`)) return;
+      DB=d; DB.audit=DB.audit||[]; audit('import backup',f.name); save();
+      if(!me()){ alert('Your account is not in the imported data. You will be signed out.'); logout(); } else render();
+    }catch(_){ alert('That file is not a valid DISC backup.'); } };
+  rd.readAsText(f);
+}
+function exportCsv(){
+  const rows=[['Name','Email','Date','Style','Primary','Secondary','D','I','S','C']];
+  DB.results.forEach(r=>{ const u=DB.users.find(x=>x.id===r.userId)||{}; rows.push([u.name||'',u.email||'',r.date,r.label,DIM_NAME[r.primary],r.secondary?DIM_NAME[r.secondary]:'',r.pct.D,r.pct.I,r.pct.S,r.pct.C]); });
+  dl('disc_results.csv',rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\r\n'),'text/csv');
+}
+
+/* =====================================================================
+   Minimal PDF writer (no external libraries – works offline)
+   ===================================================================== */
+class MiniPdf{
+  constructor(){ this.W=612; this.H=792; this.pages=[]; this.addPage(); }
+  addPage(){ this.cur=[]; this.pages.push(this.cur); }
+  static clean(s){ return String(s).replace(/[\u2013\u2014]/g,'-').replace(/[\u2018\u2019]/g,"'").replace(/[\u201C\u201D]/g,'"').replace(/\u2192/g,'->').replace(/[^\x20-\x7E]/g,'').replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)'); }
+  static rgb(hex){ const n=parseInt(hex.slice(1),16); return [(n>>16&255)/255,(n>>8&255)/255,(n&255)/255].map(v=>v.toFixed(3)).join(' '); }
+  text(x,y,s,size=10,bold=false,color='#1f2933'){ this.cur.push(`BT ${MiniPdf.rgb(color)} rg /${bold?'F2':'F1'} ${size} Tf ${x.toFixed(1)} ${(this.H-y).toFixed(1)} Td (${MiniPdf.clean(s)}) Tj ET`); }
+  rect(x,y,w,h,color){ this.cur.push(`${MiniPdf.rgb(color)} rg ${x.toFixed(1)} ${(this.H-y-h).toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)} re f`); }
+  static width(s,size,bold){ // approximate Helvetica metrics
+    let w=0; for(const ch of String(s)){ w += /[il.,'|!:;]/.test(ch)?0.25 : /[ fjtrI\-()]/.test(ch)?0.31 : /[mwMW]/.test(ch)?0.85 : /[A-Z]/.test(ch)?0.68 : 0.54; }
+    return w*size*(bold?1.05:1);
+  }
+  wrap(s,maxW,size,bold){ const words=String(s).split(/\s+/), lines=[]; let line='';
+    words.forEach(w=>{ const t=line?line+' '+w:w; if(MiniPdf.width(t,size,bold)>maxW && line){ lines.push(line); line=w; } else line=t; });
+    if(line) lines.push(line); return lines; }
+  output(){
+    const objs=[]; const add=s=>{ objs.push(s); return objs.length; };
+    add('<< /Type /Catalog /Pages 2 0 R >>'); add(null);
+    const f1=add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
+    const f2=add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>');
+    const kids=[];
+    this.pages.forEach(p=>{ const c=p.join('\n'); const cs=add(`<< /Length ${c.length} >>\nstream\n${c}\nendstream`);
+      kids.push(add(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${this.W} ${this.H}] /Resources << /Font << /F1 ${f1} 0 R /F2 ${f2} 0 R >> >> /Contents ${cs} 0 R >>`)); });
+    objs[1]=`<< /Type /Pages /Kids [${kids.map(k=>k+' 0 R').join(' ')}] /Count ${kids.length} >>`;
+    let out='%PDF-1.4\n'; const off=[];
+    objs.forEach((o,i)=>{ off.push(out.length); out+=`${i+1} 0 obj\n${o}\nendobj\n`; });
+    const x=out.length;
+    out+=`xref\n0 ${objs.length+1}\n0000000000 65535 f \n`+off.map(o=>String(o).padStart(10,'0')+' 00000 n \n').join('');
+    out+=`trailer\n<< /Size ${objs.length+1} /Root 1 0 R >>\nstartxref\n${x}\n%%EOF`;
+    return out;
+  }
+}
+function buildPdf(r, name){
+  const pdf=new MiniPdf(), M=54, CW=pdf.W-2*M; let y=0;
+  const ensure=h=>{ if(y+h>pdf.H-60){ footer(); pdf.addPage(); y=60; } };
+  const footer=()=>pdf.text(M,pdf.H-30,`DISC Assessment - ${name} - ${fmtD(r.date)}`,8,false,'#6b7785');
+  const para=(s,size=10.5,bold=false,color='#1f2933',lh=1.45)=>{ pdf.wrap(s,CW,size,bold).forEach(l=>{ ensure(size*lh); pdf.text(M,y+size,l,size,bold,color); y+=size*lh; }); };
+  const heading=s=>{ y+=10; ensure(30); pdf.text(M,y+13,s,13,true,'#2b3a4a'); y+=18; pdf.rect(M,y,CW,1,'#e3e7ec'); y+=8; };
+  const bullets=list=>list.forEach(b=>{ const ls=pdf.wrap(b,CW-16,10.5); ls.forEach((l,i)=>{ ensure(15); if(i===0) pdf.text(M+4,y+10.5,'-',10.5); pdf.text(M+16,y+10.5,l,10.5); y+=15; }); });
+
+  pdf.rect(0,0,pdf.W,70,'#2b3a4a');
+  pdf.text(M,32,'DISC Assessment Report',18,true,'#ffffff');
+  pdf.text(M,52,`${name}   |   Completed ${fmtD(r.date)}`,10,false,'#dde3ea');
+  y=96;
+  pdf.rect(M,y,64,46,DIM_COLOR[r.primary]); pdf.text(M+32-MiniPdf.width(r.label,20,true)/2,y+30,r.label,20,true,'#ffffff');
+  pdf.text(M+80,y+18,`Primary style: ${DIM_NAME[r.primary]}`,13,true);
+  pdf.text(M+80,y+36,r.secondary?`Secondary influence: ${DIM_NAME[r.secondary]}`:'No strong secondary style',10.5,false,'#6b7785');
+  y+=66;
+  heading('Profile scores (0-100)');
+  DIMS.forEach(d=>{ ensure(26); pdf.text(M,y+13,DIM_NAME[d],10.5,true); const bx=M+130,bw=CW-180;
+    pdf.rect(bx,y+2,bw,15,'#eef1f4'); pdf.rect(bx,y+2,bw*r.pct[d]/100,15,DIM_COLOR[d]); pdf.text(bx+bw+12,y+14,String(r.pct[d]),10.5,true); y+=24; });
+  y+=4; para('Scores reflect relative intensity based on Most/Least choices. Everyone is a blend of all four styles.',9,false,'#6b7785');
+  const p=PROFILE[r.primary];
+  heading(`About the ${DIM_NAME[r.primary]} style`); para(p.summary);
+  if(r.secondary){ y+=4; para(`Secondary influence - ${DIM_NAME[r.secondary]}: ${PROFILE[r.secondary].summary}`); }
+  heading('Strengths'); bullets(p.strengths);
+  heading('Watch-outs'); bullets(p.watch);
+  heading('Works best with'); bullets(p.works);
+  heading('Communicating with you'); bullets(p.comm);
+  heading('The four DISC styles');
+  DIMS.forEach(d=>{ ensure(30); pdf.text(M,y+11,DIM_NAME[d],10.5,true,DIM_COLOR[d]); y+=16; para(PROFILE[d].summary,9.5,false,'#1f2933',1.4); y+=4; });
+  y+=6; para('DISC describes behavioral preferences. It is intended for self-awareness and team communication, not for hiring, promotion, or performance decisions.',8.5,false,'#6b7785');
+  footer();
+  return pdf.output();
+}
+function downloadPdf(id){
+  const r=DB.results.find(x=>x.id===id), u=me();
+  if(!r||(r.userId!==u.id&&!isAdmin())) return;
+  const name=userName(r.userId);
+  const bytes=buildPdf(r,name);
+  const arr=new Uint8Array(bytes.length); for(let i=0;i<bytes.length;i++) arr[i]=bytes.charCodeAt(i)&255;
+  dl(`DISC_${name.replace(/[^A-Za-z0-9]+/g,'_')}_${r.date.slice(0,10)}.pdf`,arr,'application/pdf');
+}
+
+/* ---------- Boot ---------- */
+if(typeof window!=='undefined' && document.getElementById('app')) route(me()?'home':'auth');
+</script>
+</body>
+</html>
