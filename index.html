@@ -6,6 +6,7 @@
 <title>DISC Assessment</title>
 <!-- DISC Assessment App | Rev 1.0 | 2026-10-01 | Initial build -->
 <!-- DISC Assessment App | Rev 1.1 | 2026-10-07 | Quiz input fix: every descriptor now gets its own 1-5 rating (was one Most/Least pick per set). Scoring updated; Rev 1.0 results still display. -->
+<!-- DISC Assessment App | Rev 1.2 | 2026-10-22 | Admin > Results: added two team DISC charts from each user's most recent result - (1) dots only, (2) dots labeled with names. No change to scoring or stored data. -->
 <style>
   :root{--bg:#f5f6f8;--card:#fff;--ink:#1f2933;--muted:#6b7785;--line:#e3e7ec;--brand:#2b3a4a;--accent:#2f6db5;
         --D:#d64545;--I:#e0a526;--S:#3a9a5b;--C:#2f6db5;}
@@ -56,6 +57,14 @@
   .bars .v{width:44px;text-align:right;font-weight:600}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
   @media(max-width:700px){.grid2{grid-template-columns:1fr}}
+  /* Rev 1.2 team DISC charts */
+  .charts{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:4px 0 18px}
+  @media(max-width:860px){.charts{grid-template-columns:1fr}}
+  .chartbox{border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+  .chartbox h3{margin:0 0 2px}
+  .chartbox svg{width:100%;height:auto;display:block;margin-top:8px}
+  .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:6px}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:-1px}
   ul{margin:6px 0;padding-left:20px} li{margin:3px 0}
   .stat{flex:1;min-width:110px;border:1px solid var(--line);border-radius:8px;padding:12px 14px}
   .stat b{display:block;font-size:22px}
@@ -73,13 +82,13 @@
 
 <script>
 /* =====================================================================
-   DISC Assessment App  –  Rev 1.1 (2026-10-07)
+   DISC Assessment App  –  Rev 1.2 (2026-10-22)
    Storage: browser localStorage (key below). Admin can export/import a
    JSON backup. Client-side auth only – see notes in README section.
    ===================================================================== */
 const STORE_KEY = 'disc_app_v1';
 const SESSION_KEY = 'disc_app_session';
-const APP_REV = '1.1';
+const APP_REV = '1.2';
 const DRAFT_KEY = id => 'disc_draft_v11_'+id; // Rev 1.1 draft format (ratings)
 const SCALE = [[1,'Not like me'],[2,'A little'],[3,'Somewhat'],[4,'Mostly'],[5,'Very much like me']];
 
@@ -378,6 +387,8 @@ function vAdmin(){
   } else if(tab==='results'){
     const rs=[...DB.results].sort((a,b)=>b.date.localeCompare(a.date)).filter(r=>!STATE.q||userName(r.userId).toLowerCase().includes(STATE.q.toLowerCase()));
     body=`<div class="row" style="margin-bottom:12px"><input id="uf" placeholder="Search by name" style="max-width:280px" value="${esc(STATE.q||'')}"><span class="spacer"></span><button onclick="exportCsv()">Export CSV</button></div>
+    ${teamCharts()}
+    <h3>Results log</h3>
     <table><tr><th>Name</th><th>Date</th><th>Style</th><th>D</th><th>I</th><th>S</th><th>C</th><th></th></tr>
     ${rs.map(r=>`<tr><td>${esc(userName(r.userId))}</td><td>${fmt(r.date)}</td><td><b>${esc(r.label)}</b></td>${DIMS.map(d=>`<td>${r.pct[d]}</td>`).join('')}
       <td style="text-align:right;white-space:nowrap"><button class="sm" onclick="route('result',{id:'${r.id}'})">View</button> <button class="sm" onclick="downloadPdf('${r.id}')">PDF</button> <button class="sm danger" onclick="delResult('${r.id}')">Delete</button></td></tr>`).join('')||'<tr><td colspan="8" class="muted">No results yet.</td></tr>'}</table>`;
@@ -400,6 +411,70 @@ function vAdmin(){
     ${body}</div>`;
   const f=$('#uf'); if(f){ f.oninput=()=>{ const pos=f.selectionStart; STATE.q=f.value; render(); const n=$('#uf'); n.focus(); n.setSelectionRange(pos,pos); }; }
   const imp=$('#imp'); if(imp) imp.onchange=importJson;
+}
+/* ---------- Rev 1.2: Team DISC charts (admin) ----------
+   Position from 0-100 scores: x = (I+S)-(D+C)  -> right = people-oriented, left = task-oriented
+                               y = (D+I)-(S+C)  -> up = fast-paced/outgoing, down = moderate-paced/reserved
+   Quadrants: D top-left, I top-right, S bottom-right, C bottom-left. Scaled /140 for spread, clamped to the circle. */
+function discPoint(r){
+  let x=((r.pct.I+r.pct.S)-(r.pct.D+r.pct.C))/140, y=((r.pct.D+r.pct.I)-(r.pct.S+r.pct.C))/140;
+  const m=Math.hypot(x,y); if(m>0.94){ x=x/m*0.94; y=y/m*0.94; }
+  return {x,y};
+}
+function discChart(list, labeled){
+  const W=440, H=440, cx=W/2, cy=H/2, R=170, F='Segoe UI,Arial,sans-serif';
+  const q=[['D',-1,-1,'Dominance'],['I',1,-1,'Influence'],['S',1,1,'Steadiness'],['C',-1,1,'Conscientiousness']];
+  const arc=(sx,sy)=>{ // quadrant wedge path
+    const a0={'-1,-1':180,'1,-1':270,'1,1':0,'-1,1':90}[sx+','+sy], rad=d=>d*Math.PI/180;
+    const p=a=>`${(cx+R*Math.cos(rad(a))).toFixed(1)} ${(cy+R*Math.sin(rad(a))).toFixed(1)}`;
+    return `M${cx} ${cy} L${p(a0)} A${R} ${R} 0 0 1 ${p(a0+90)} Z`; };
+  let g=q.map(([d,sx,sy,n])=>`<path d="${arc(sx,sy)}" fill="${DIM_COLOR[d]}" fill-opacity=".13" stroke="${DIM_COLOR[d]}" stroke-opacity=".35"/>
+    <text x="${cx+sx*R*.62}" y="${cy+sy*R*.62+14}" text-anchor="middle" font-family="${F}" font-size="44" font-weight="700" fill="${DIM_COLOR[d]}" fill-opacity=".22">${d}</text>`).join('');
+  g+=`<line x1="${cx-R}" y1="${cy}" x2="${cx+R}" y2="${cy}" stroke="#9aa5b1" stroke-width="1"/><line x1="${cx}" y1="${cy-R}" x2="${cx}" y2="${cy+R}" stroke="#9aa5b1" stroke-width="1"/>
+    <circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="#9aa5b1"/>
+    <circle cx="${cx}" cy="${cy}" r="${R/2}" fill="none" stroke="#c5cdd6" stroke-dasharray="3 4"/>`;
+  // corner quadrant names + axis captions
+  const cap=(x,y,t,a,c,w)=>`<text x="${x}" y="${y}" text-anchor="${a}" font-family="${F}" font-size="11" font-weight="${w||600}" fill="${c||'#6b7785'}">${t}</text>`;
+  g+=cap(8,18,'Dominance','start',DIM_COLOR.D)+cap(W-8,18,'Influence','end',DIM_COLOR.I)+cap(W-8,H-8,'Steadiness','end',DIM_COLOR.S)+cap(8,H-8,'Conscientiousness','start',DIM_COLOR.C);
+  g+=cap(cx,cy-R-8,'Fast-paced / Outgoing','middle',null,400)+cap(cx,cy+R+18,'Moderate-paced / Reserved','middle',null,400);
+  g+=`<text transform="translate(${cx-R-10} ${cy}) rotate(-90)" text-anchor="middle" font-family="${F}" font-size="11" fill="#6b7785">Task-oriented</text>
+      <text transform="translate(${cx+R+10} ${cy}) rotate(90)" text-anchor="middle" font-family="${F}" font-size="11" fill="#6b7785">People-oriented</text>`;
+  // points (identical positions get a small ring offset so every dot stays visible)
+  const seen={}; const pts=list.map(r=>{ const p=discPoint(r); let px=cx+p.x*R, py=cy-p.y*R;
+    const k=Math.round(px)+','+Math.round(py), n=seen[k]=(seen[k]||0)+1;
+    if(n>1){ const a=n*2.4; px+=Math.cos(a)*7*Math.ceil((n-1)/6); py+=Math.sin(a)*7*Math.ceil((n-1)/6); }
+    return {r,px,py,name:userName(r.userId)}; });
+  let dots='', labels='';
+  if(labeled){ // greedy label placement: try 8 spots around the dot, avoid other labels and dots
+    const fs=11, boxes=[{x:cx-R-18,y:cy-45,w:14,h:90},{x:cx+R+4,y:cy-48,w:14,h:96},{x:cx-75,y:cy-R-20,w:150,h:14},{x:cx-85,y:cy+R+6,w:170,h:14}], hit=(a,b)=>a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
+    const dotBoxes=pts.map(p=>({x:p.px-6,y:p.py-6,w:12,h:12}));
+    pts.forEach(p=>{
+      const t=p.name.length>22?p.name.slice(0,21)+'…':p.name, w=t.length*fs*0.56+4, h=fs+3;
+      const cand=[[9,-h/2],[-9-w,-h/2],[-w/2,-9-h],[-w/2,9],[9,-h-3],[9,3],[-9-w,-h-3],[-9-w,3]];
+      let best=null;
+      for(let ring=0;ring<6&&!best;ring++) for(const [dx,dy] of cand){
+        const b={x:p.px+dx*(1+ring*.9),y:p.py+dy+(dy<0?-ring*6:ring*6),w,h};
+        if(b.x<2||b.x+b.w>W-2||b.y<2||b.y+b.h>H-2) continue;
+        if(boxes.some(o=>hit(o,b))||dotBoxes.some(o=>hit(o,b))) continue; best=b; break; }
+      if(!best) best={x:Math.min(Math.max(p.px+9,2),W-w-2),y:p.py-h/2,w,h};
+      boxes.push(best);
+      const lx=best.x+w/2, ly=best.y+h/2, far=Math.hypot(lx-p.px,ly-p.py)>w/2+14;
+      if(far) labels+=`<line x1="${p.px}" y1="${p.py}" x2="${best.x+(best.x>p.px?0:w)}" y2="${ly}" stroke="#9aa5b1" stroke-width=".8"/>`;
+      labels+=`<rect x="${best.x}" y="${best.y}" width="${w}" height="${h}" rx="3" fill="#fff" fill-opacity=".85"/><text x="${best.x+2}" y="${best.y+h-4}" font-family="${F}" font-size="${fs}" font-weight="600" fill="#1f2933">${esc(t)}</text>`;
+    });
+  }
+  pts.forEach(p=>{ dots+=`<circle cx="${p.px.toFixed(1)}" cy="${p.py.toFixed(1)}" r="5.5" fill="${DIM_COLOR[p.r.primary]}" stroke="#fff" stroke-width="1.5">${labeled?`<title>${esc(p.name)} — ${esc(p.r.label)} (${fmtD(p.r.date)})</title>`:`<title>${esc(p.r.label)}</title>`}</circle>`; });
+  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Team DISC chart${labeled?' with names':''}">${g}${labels}${dots}</svg>`;
+}
+function teamCharts(){
+  const list=latestPerUser().filter(r=>r&&r.pct);
+  if(!list.length) return `<div class="msg info">Team DISC charts will appear once at least one assessment is completed.</div>`;
+  const legend=`<div class="legend">${DIMS.map(d=>`<span><i style="background:${DIM_COLOR[d]}"></i>Primary ${DIM_NAME[d]}</span>`).join('')}</div>`;
+  return `<div class="charts">
+    <div class="chartbox"><h3>Team DISC map</h3><div class="muted">Most recent result for each person (${list.length}) · dots only</div>${discChart(list,false)}${legend}</div>
+    <div class="chartbox"><h3>Team DISC map — named</h3><div class="muted">Same data, with each person's name · hover a dot for style and date</div>${discChart(list,true)}${legend}</div>
+  </div>
+  <div class="muted" style="margin-bottom:14px">Distance from center shows how strongly a style shows; dots near the center are more balanced across all four. Charts always show everyone's latest result (the search box filters only the log below).</div>`;
 }
 function latestPerUser(){ const m={}; DB.results.forEach(r=>{ if(!m[r.userId]||m[r.userId].date<r.date) m[r.userId]=r; }); return Object.values(m); }
 function toggleRole(id){ const x=DB.users.find(u=>u.id===id); x.role=x.role==='admin'?'user':'admin'; audit('role change',x.email+' → '+x.role); save(); render(); }
@@ -523,4 +598,3 @@ if(typeof window!=='undefined' && document.getElementById('app')) route(me()?'ho
 </script>
 </body>
 </html>
-
